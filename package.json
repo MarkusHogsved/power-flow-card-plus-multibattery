@@ -1,6 +1,6 @@
 {
   "name": "power-flow-card-plus-multibattery",
-  "version": "0.3.7-mb.1",
+  "version": "0.3.7-mb.2",
   "private": true,
   "description": "Power Flow Card Plus with additional batteries (SOC chips and hover tooltip)",
   "license": "MIT",

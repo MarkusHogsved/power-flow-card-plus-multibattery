@@ -1,0 +1,43 @@
+From 3335138c9432582a5c72a8efb101938632a793e2 Mon Sep 17 00:00:00 2001
+From: Markus Hogsved <markus.hogsved@gmail.com>
+Date: Tue, 20 Oct 2026 20:51:18 +0200
+Subject: [PATCH 2/3] fix(battery): keep flow lines aligned when additional
+ batteries are shown
+
+The room reserved under the battery label for the additional-battery
+chips made the card content taller. The flow-line layers (.lines and
+.right-individual-flow-container) are anchored to its bottom, so they
+moved down by the same 16 px and no longer met the circles. Shift them
+back with the 'translate' property, which composes with the no-labels
+transform.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ packages/shared/src/style/index.ts | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/packages/shared/src/style/index.ts b/packages/shared/src/style/index.ts
+index cc1cca6..8959779 100644
+--- a/packages/shared/src/style/index.ts
++++ b/packages/shared/src/style/index.ts
+@@ -209,8 +209,15 @@ export const styles = css`
+   /* Additional batteries: compact SOC chips under the battery label */
+   .circle-container.battery.has-additional {
+     position: relative;
+-    /* room for the chips without moving the circle (keeps the flow lines aligned) */
+-    margin-bottom: 16px;
++    /* room for the chips under the label, without moving the circle */
++    margin-bottom: var(--additional-batteries-height, 16px);
++  }
++  /* The flow-line layers are anchored to the bottom of the card content, so
++     the extra room above would push them up; move them back down by the
++     same amount. "translate" composes with the no-labels "transform". */
++  .card-content:has(.circle-container.battery.has-additional) .lines,
++  .card-content:has(.circle-container.battery.has-additional) .right-individual-flow-container {
++    translate: 0 calc(-1 * var(--additional-batteries-height, 16px));
+   }
+   .additional-batteries {
+     position: absolute;
+-- 
+2.39.5
+
