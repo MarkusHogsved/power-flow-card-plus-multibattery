@@ -1,0 +1,465 @@
+From 7a9b6f53b35e89219780e6a7530418037acbed3f Mon Sep 17 00:00:00 2001
+From: Markus Hogsved <markus.hogsved@gmail.com>
+Date: Tue, 20 Oct 2026 19:52:49 +0200
+Subject: [PATCH] feat(battery): additional_batteries - SOC chips and hover
+ tooltip
+
+Optional `entities.battery.additional_batteries` list. Each entry shows a
+compact chip (icon + SOC) under the battery label, coloured as charging
+or discharging when a power entity is given, and the battery circle gets
+a native hover tooltip listing every battery's SOC and power. Clicking a
+chip follows the card's normal tap/hold/double-tap handling for that
+entry's state_of_charge entity. Without the option nothing changes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../__tests__/additional-batteries.test.ts    | 161 ++++++++++++++++++
+ .../src/components/additional-batteries.ts    | 138 +++++++++++++++
+ packages/shared/src/components/battery.ts     |  29 +++-
+ packages/shared/src/style/index.ts            |  34 ++++
+ packages/shared/src/types/config.ts           |  16 ++
+ 5 files changed, 377 insertions(+), 1 deletion(-)
+ create mode 100644 packages/flixlix-cards/power-flow-card-plus/__tests__/additional-batteries.test.ts
+ create mode 100644 packages/shared/src/components/additional-batteries.ts
+
+diff --git a/packages/flixlix-cards/power-flow-card-plus/__tests__/additional-batteries.test.ts b/packages/flixlix-cards/power-flow-card-plus/__tests__/additional-batteries.test.ts
+new file mode 100644
+index 0000000..f703df0
+--- /dev/null
++++ b/packages/flixlix-cards/power-flow-card-plus/__tests__/additional-batteries.test.ts
+@@ -0,0 +1,161 @@
++import { describe, expect, test } from "vitest";
++
++import {
++  batteryTooltip,
++  computeAdditionalBatteries,
++} from "@flixlix-cards/shared/components/additional-batteries";
++import { type PowerFlowCardPlusConfig } from "@flixlix-cards/shared/types";
++import { render } from "lit";
++import { PowerFlowCardPlus } from "../src/power-flow-card-plus";
++
++(globalThis as any).ResizeObserver = class {
++  observe() {}
++  disconnect() {}
++  unobserve() {}
++};
++
++function makeHass(states: Record<string, [string, string?, string?]>) {
++  const hassStates: Record<string, any> = {};
++  for (const [id, [state, unit, name]] of Object.entries(states)) {
++    hassStates[id] = {
++      state,
++      attributes: { friendly_name: name ?? id, unit_of_measurement: unit },
++    };
++  }
++  return {
++    localize: (key: string) => key,
++    locale: { language: "en", number_format: "comma_decimal" },
++    states: hassStates,
++    config: {},
++    user: { name: "test" },
++    connection: {},
++  } as any;
++}
++
++const config = {
++  type: "custom:power-flow-card-plus",
++  kilo_threshold: 1000,
++  kilo_decimals: 1,
++  base_decimals: 0,
++} as any;
++
++describe("computeAdditionalBatteries", () => {
++  test("reads SOC and power, positive power = charging", () => {
++    const hass = makeHass({
++      "sensor.victron_soc": ["90", "%", "NKON"],
++      "sensor.victron_power": ["-259", "W"],
++    });
++    const [b] = computeAdditionalBatteries(hass, [
++      { state_of_charge: "sensor.victron_soc", entity: "sensor.victron_power", name: "Victron" },
++    ]);
++    expect(b.name).toBe("Victron");
++    expect(b.stateOfCharge).toBe(90);
++    expect(b.power).toBe(-259);
++  });
++
++  test("invert_state flips the sign and kW is converted to W", () => {
++    const hass = makeHass({ "sensor.soc": ["70", "%"], "sensor.p": ["1.2", "kW"] });
++    const [b] = computeAdditionalBatteries(hass, [
++      { state_of_charge: "sensor.soc", entity: "sensor.p", invert_state: true },
++    ]);
++    expect(b.power).toBe(-1200);
++  });
++
++  test("no power entity → power null, name falls back to friendly_name, default icon", () => {
++    const hass = makeHass({ "sensor.anker_soc": ["70", "%", "Anker UPS"] });
++    const [b] = computeAdditionalBatteries(hass, [{ state_of_charge: "sensor.anker_soc" }]);
++    expect(b.power).toBeNull();
++    expect(b.name).toBe("Anker UPS");
++    expect(b.icon).toBe("mdi:battery-outline");
++  });
++
++  test("missing or unavailable SOC entity → stateOfCharge null, entries without SOC are skipped", () => {
++    const hass = makeHass({ "sensor.soc": ["unavailable", "%"] });
++    const list = computeAdditionalBatteries(hass, [
++      { state_of_charge: "sensor.soc" },
++      { state_of_charge: "sensor.missing" },
++      { state_of_charge: "" } as any,
++    ]);
++    expect(list.length).toBe(2);
++    expect(list.map((b) => b.stateOfCharge)).toEqual([null, null]);
++  });
++});
++
++describe("batteryTooltip", () => {
++  test("one line per battery with SOC and direction", () => {
++    const hass = makeHass({
++      "sensor.v_soc": ["90", "%"],
++      "sensor.v_p": ["-259", "W"],
++      "sensor.a_soc": ["70", "%"],
++    });
++    const extras = computeAdditionalBatteries(hass, [
++      { state_of_charge: "sensor.v_soc", entity: "sensor.v_p", name: "Victron" },
++      { state_of_charge: "sensor.a_soc", name: "Anker" },
++    ]);
++    const text = batteryTooltip(
++      hass,
++      config,
++      { name: "Growatt", stateOfCharge: 88, toBattery: 0, fromBattery: 1300 },
++      extras
++    );
++    expect(text.split("\n")).toEqual(["Growatt: 88% ↑1.3 kW", "Victron: 90% ↑259 W", "Anker: 70%"]);
++  });
++});
++
++describe("card render", () => {
++  const cardConfig = {
++    type: "custom:power-flow-card-plus",
++    entities: {
++      grid: { entity: "sensor.grid" },
++      battery: {
++        entity: "sensor.battery",
++        state_of_charge: "sensor.battery_soc",
++        additional_batteries: [
++          {
++            state_of_charge: "sensor.v_soc",
++            entity: "sensor.v_p",
++            name: "Victron",
++            icon: "mdi:home-battery",
++          },
++          { state_of_charge: "sensor.a_soc", name: "Anker" },
++        ],
++      },
++    },
++  } as unknown as PowerFlowCardPlusConfig;
++
++  const renderCard = (cfg: PowerFlowCardPlusConfig) => {
++    const hass = makeHass({
++      "sensor.grid": ["100", "W"],
++      "sensor.battery": ["0", "W"],
++      "sensor.battery_soc": ["88", "%"],
++      "sensor.v_soc": ["90", "%"],
++      "sensor.v_p": ["500", "W"],
++      "sensor.a_soc": ["70", "%"],
++    });
++    const card = new PowerFlowCardPlus();
++    card.setConfig(cfg);
++    card.hass = hass;
++    card.connectedCallback();
++    const container = document.createElement("div");
++    render((card as unknown as { render: () => any }).render(), container);
++    return container;
++  };
++
++  test("renders one chip per additional battery and a tooltip on the battery circle", () => {
++    const el = renderCard(cardConfig);
++    const chips = el.querySelectorAll(".additional-battery");
++    expect(chips.length).toBe(2);
++    expect(chips[0].textContent?.trim()).toBe("90%");
++    expect(chips[0].classList.contains("charging")).toBe(true);
++    const container = el.querySelector(".circle-container.battery");
++    expect(container?.getAttribute("title")).toContain("Victron: 90% ↓500 W");
++  });
++
++  test("without additional_batteries nothing changes (no chips, no tooltip)", () => {
++    const cfg = JSON.parse(JSON.stringify(cardConfig));
++    delete cfg.entities.battery.additional_batteries;
++    const el = renderCard(cfg);
++    expect(el.querySelectorAll(".additional-battery").length).toBe(0);
++    expect(el.querySelector(".circle-container.battery")?.hasAttribute("title")).toBe(false);
++  });
++});
+diff --git a/packages/shared/src/components/additional-batteries.ts b/packages/shared/src/components/additional-batteries.ts
+new file mode 100644
+index 0000000..8f515f1
+--- /dev/null
++++ b/packages/shared/src/components/additional-batteries.ts
+@@ -0,0 +1,138 @@
++import { getEntityState } from "@flixlix-cards/shared/states/utils/get-entity-state";
++import { getEntityStateWatts } from "@flixlix-cards/shared/states/utils/get-entity-state-watts";
++import {
++  type AdditionalBattery,
++  type CardMainContext,
++  type FlowCardPlusConfig,
++} from "@flixlix-cards/shared/types";
++import { displayValue } from "@flixlix-cards/shared/utils/display-value";
++import { type HomeAssistant } from "custom-card-helpers";
++import { html, nothing } from "lit";
++
++export interface AdditionalBatteryState {
++  config: AdditionalBattery;
++  name: string;
++  icon: string;
++  /** State of charge in %, null when unavailable. */
++  stateOfCharge: number | null;
++  /** Power in W, positive = charging. null when no power entity is configured or it is unavailable. */
++  power: number | null;
++}
++
++const friendlyName = (hass: HomeAssistant, entityId: string): string =>
++  (hass.states[entityId]?.attributes?.friendly_name as string | undefined) ?? entityId;
++
++export const computeAdditionalBatteries = (
++  hass: HomeAssistant,
++  batteries: AdditionalBattery[] | undefined
++): AdditionalBatteryState[] =>
++  (batteries ?? [])
++    .filter((b) => !!b?.state_of_charge)
++    .map((b) => {
++      const socAvailable = hass.states[b.state_of_charge] !== undefined;
++      const stateOfCharge = socAvailable ? getEntityState(hass, b.state_of_charge) : null;
++      let power: number | null = null;
++      if (
++        b.entity &&
++        hass.states[b.entity] !== undefined &&
++        getEntityState(hass, b.entity) !== null
++      ) {
++        const watts = getEntityStateWatts(hass, b.entity);
++        power = b.invert_state ? -watts : watts;
++      }
++      return {
++        config: b,
++        name: b.name ?? friendlyName(hass, b.state_of_charge),
++        icon: b.icon ?? "mdi:battery-outline",
++        stateOfCharge,
++        power,
++      };
++    });
++
++const formatPower = (
++  hass: HomeAssistant,
++  config: FlowCardPlusConfig,
++  power: number | null
++): string => {
++  if (power === null || power === 0) return "";
++  // Same arrows as the main battery circle: down = into the battery, up = out of it.
++  const arrow = power > 0 ? "↓" : "↑";
++  return ` ${arrow}${displayValue(hass, config, Math.abs(power), {})}`;
++};
++
++const formatSoc = (
++  hass: HomeAssistant,
++  config: FlowCardPlusConfig,
++  soc: number | null,
++  decimals?: number
++): string =>
++  soc === null
++    ? "–"
++    : displayValue(hass, config, soc, {
++        unit: "%",
++        unitWhiteSpace: false,
++        decimals: decimals ?? 0,
++      });
++
++/** Multi-line text for the native hover tooltip of the battery circle. */
++export const batteryTooltip = (
++  hass: HomeAssistant,
++  config: FlowCardPlusConfig,
++  main: {
++    name: string;
++    stateOfCharge: number | null;
++    stateOfChargeDecimals?: number;
++    toBattery: number | null;
++    fromBattery: number | null;
++  },
++  extras: AdditionalBatteryState[]
++): string => {
++  const mainPower = (main.toBattery ?? 0) - (main.fromBattery ?? 0);
++  const lines = [
++    `${main.name}: ${formatSoc(hass, config, main.stateOfCharge, main.stateOfChargeDecimals)}${formatPower(hass, config, mainPower)}`,
++    ...extras.map(
++      (e) =>
++        `${e.name}: ${formatSoc(hass, config, e.stateOfCharge, e.config.state_of_charge_decimals)}${formatPower(hass, config, e.power)}`
++    ),
++  ];
++  return lines.join("\n");
++};
++
++export const additionalBatteriesElement = (
++  main: CardMainContext,
++  config: FlowCardPlusConfig,
++  extras: AdditionalBatteryState[]
++) => {
++  if (!extras.length) return nothing;
++  return html`<div class="additional-batteries">
++    ${extras.map(
++      (e) =>
++        html`<span
++          class="additional-battery ${e.power !== null && e.power > 0
++            ? "charging"
++            : e.power !== null && e.power < 0
++              ? "discharging"
++              : ""}"
++          title="${e.name}: ${formatSoc(
++            main.hass,
++            config,
++            e.stateOfCharge,
++            e.config.state_of_charge_decimals
++          )}${formatPower(main.hass, config, e.power)}"
++          @click=${(ev: MouseEvent) => main.onEntityClick(ev, e.config, e.config.state_of_charge)}
++          @dblclick=${(ev: MouseEvent) =>
++            main.onEntityDoubleClick(ev, e.config, e.config.state_of_charge)}
++          @pointerdown=${(ev: PointerEvent) =>
++            main.onEntityPointerDown(ev, e.config, e.config.state_of_charge)}
++          @pointerup=${(ev: PointerEvent) => main.onEntityPointerUp(ev)}
++          @pointercancel=${(ev: PointerEvent) => main.onEntityPointerUp(ev)}
++          ><ha-icon class="small" .icon=${e.icon}></ha-icon>${formatSoc(
++            main.hass,
++            config,
++            e.stateOfCharge,
++            e.config.state_of_charge_decimals
++          )}</span
++        >`
++    )}
++  </div>`;
++};
+diff --git a/packages/shared/src/components/battery.ts b/packages/shared/src/components/battery.ts
+index d91c01a..855f299 100644
+--- a/packages/shared/src/components/battery.ts
++++ b/packages/shared/src/components/battery.ts
+@@ -5,6 +5,11 @@ import {
+ } from "@flixlix-cards/shared/types";
+ import { displayValue } from "@flixlix-cards/shared/utils/display-value";
+ import { html, nothing } from "lit";
++import {
++  additionalBatteriesElement,
++  batteryTooltip,
++  computeAdditionalBatteries,
++} from "./additional-batteries";
+ 
+ export const batteryElement = (
+   main: CardMainContext,
+@@ -18,7 +23,28 @@ export const batteryElement = (
+   }
+ ) => {
+   const disableEntityClick = config.clickable_entities === false;
+-  return html`<div class="circle-container battery">
++  const additionalBatteries = computeAdditionalBatteries(
++    main.hass,
++    entities.battery?.additional_batteries
++  );
++  const tooltip = additionalBatteries.length
++    ? batteryTooltip(
++        main.hass,
++        config,
++        {
++          name: battery.name,
++          stateOfCharge: battery.state_of_charge.state,
++          stateOfChargeDecimals: battery.state_of_charge.decimals,
++          toBattery: battery.state.toBattery,
++          fromBattery: battery.state.fromBattery,
++        },
++        additionalBatteries
++      )
++    : undefined;
++  return html`<div
++    class="circle-container battery ${additionalBatteries.length ? "has-additional" : ""}"
++    title=${tooltip ?? nothing}
++  >
+     <div
+       class="circle ${disableEntityClick ? "pointer-events-none" : ""}"
+       @click=${(e: MouseEvent) => {
+@@ -230,5 +256,6 @@ export const batteryElement = (
+         : nothing}
+     </div>
+     <span class="label">${battery.name}</span>
++    ${additionalBatteriesElement(main, config, additionalBatteries)}
+   </div>`;
+ };
+diff --git a/packages/shared/src/style/index.ts b/packages/shared/src/style/index.ts
+index e7370d2..cc1cca6 100644
+--- a/packages/shared/src/style/index.ts
++++ b/packages/shared/src/style/index.ts
+@@ -206,6 +206,40 @@ export const styles = css`
+     height: 110px;
+     justify-content: flex-end;
+   }
++  /* Additional batteries: compact SOC chips under the battery label */
++  .circle-container.battery.has-additional {
++    position: relative;
++    /* room for the chips without moving the circle (keeps the flow lines aligned) */
++    margin-bottom: 16px;
++  }
++  .additional-batteries {
++    position: absolute;
++    top: 100%;
++    left: 50%;
++    transform: translateX(-50%);
++    display: flex;
++    gap: 6px;
++    white-space: nowrap;
++    font-size: 11px;
++    line-height: 14px;
++    color: var(--secondary-text-color);
++  }
++  .additional-battery {
++    cursor: var(--clickable-cursor);
++    display: inline-flex;
++    align-items: center;
++    gap: 1px;
++  }
++  .additional-battery ha-icon.small {
++    --mdc-icon-size: 12px;
++    padding-bottom: 0;
++  }
++  .additional-battery.charging {
++    color: var(--energy-battery-in-color, var(--secondary-text-color));
++  }
++  .additional-battery.discharging {
++    color: var(--energy-battery-out-color, var(--secondary-text-color));
++  }
+   .spacer {
+     width: var(--size-circle-entity);
+   }
+diff --git a/packages/shared/src/types/config.ts b/packages/shared/src/types/config.ts
+index 718406d..0415396 100644
+--- a/packages/shared/src/types/config.ts
++++ b/packages/shared/src/types/config.ts
+@@ -63,8 +63,24 @@ export interface EnergyFlowCardPlusConfig extends LovelaceCardConfig, mainConfig
+ 
+ export type IndividualField = IndividualDeviceType[];
+ 
++/** An extra battery shown as a compact SOC chip under the main battery circle. */
++export interface AdditionalBattery {
++  /** Entity holding the state of charge (%). */
++  state_of_charge: string;
++  /** Optional power entity. Positive = charging, negative = discharging (flip with invert_state). */
++  entity?: string;
++  invert_state?: boolean;
++  name?: string;
++  icon?: string;
++  state_of_charge_decimals?: number;
++  tap_action?: any;
++  hold_action?: any;
++  double_tap_action?: any;
++}
++
+ interface Battery extends BaseConfigEntity {
+   state_of_charge?: string;
++  additional_batteries?: AdditionalBattery[];
+   state_of_charge_unit?: string;
+   state_of_charge_unit_white_space?: boolean;
+   state_of_charge_decimals?: number;
+-- 
+2.39.5
+
