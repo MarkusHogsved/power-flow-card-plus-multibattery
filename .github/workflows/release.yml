@@ -46,7 +46,7 @@ jobs:
 
       - name: Build
         if: steps.version.outputs.exists == 'false'
-        run: scripts/build.sh
+        run: bash scripts/build.sh
 
       - name: Extract release notes
         if: steps.version.outputs.exists == 'false'

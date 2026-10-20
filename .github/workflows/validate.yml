@@ -7,7 +7,10 @@ on:
     - cron: "0 4 * * 1"  # weekly, catches new HACS checks breaking us
 
 jobs:
+  # HACS reads the card from the latest release asset, which only exists
+  # once Release has run on main - so validate main, not PR branches.
   hacs:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: hacs/action@main
@@ -23,7 +26,7 @@ jobs:
           node-version: "22"
       - run: corepack enable
       - name: Build from upstream + patches (typecheck, tests, bundle)
-        run: scripts/build.sh
+        run: bash scripts/build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: power-flow-card-plus-multibattery
