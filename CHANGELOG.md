@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.7-mb.2
+
+- Fix: the flow lines no longer drift away from the circles when
+  `additional_batteries` is used. The row of SOC chips made the card 16 px
+  taller, and the line layers are anchored to the bottom of the card, so
+  they moved down by the same amount (the battery→home line ended inside the
+  battery circle). They are now shifted back by exactly the height of the
+  chip row. Cards without the option are unchanged.
+
 ## 0.3.7-mb.1
 
 - First release: Power Flow Card Plus 0.3.7 with
