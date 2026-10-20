@@ -26,7 +26,7 @@ card looks exactly like the original.
    same card type, `custom:power-flow-card-plus`, and only one can be loaded.
    Your existing cards keep working without changes.
 4. Reload the browser. The console shows
-   `⚡ Power Flow Card Plus v0.3.7-mb.2 is installed`.
+   `⚡ Power Flow Card Plus v0.3.7-mb.3 is installed`.
 
 ## The new option: `entities.battery.additional_batteries`
 

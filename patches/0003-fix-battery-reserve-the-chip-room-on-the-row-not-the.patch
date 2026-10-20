@@ -1,0 +1,41 @@
+From 94bb8950fb20aed6345a48929fbdd8bbbf7b4e63 Mon Sep 17 00:00:00 2001
+From: Markus Hogsved <markus.hogsved@gmail.com>
+Date: Tue, 20 Oct 2026 21:05:43 +0200
+Subject: [PATCH 3/4] fix(battery): reserve the chip room on the row, not the
+ battery container
+
+The 16 px margin under the battery container made the bottom row taller.
+The individual circle next to the battery is bottom-aligned in that row,
+so it - and its line up to home - moved down and left a gap under the
+home circle. Reserve the room as padding on the row instead: the row's
+content height is unchanged, the card still grows by 16 px, and the
+line-layer shift from the previous fix still applies.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ packages/shared/src/style/index.ts | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/packages/shared/src/style/index.ts b/packages/shared/src/style/index.ts
+index 8959779..cfad981 100644
+--- a/packages/shared/src/style/index.ts
++++ b/packages/shared/src/style/index.ts
+@@ -209,8 +209,13 @@ export const styles = css`
+   /* Additional batteries: compact SOC chips under the battery label */
+   .circle-container.battery.has-additional {
+     position: relative;
+-    /* room for the chips under the label, without moving the circle */
+-    margin-bottom: var(--additional-batteries-height, 16px);
++  }
++  /* Room for the chips under the label. Reserved on the row, not on the
++     battery container: a taller container would make the row taller, and the
++     bottom-aligned individual circle next to the battery (with its line up to
++     home) would move down with it. */
++  .row:has(> .circle-container.battery.has-additional) {
++    padding-bottom: var(--additional-batteries-height, 16px);
+   }
+   /* The flow-line layers are anchored to the bottom of the card content, so
+      the extra room above would push them up; move them back down by the
+-- 
+2.39.5
+
