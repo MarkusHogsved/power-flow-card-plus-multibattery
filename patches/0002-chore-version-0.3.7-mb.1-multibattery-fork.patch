@@ -1,0 +1,29 @@
+From 830dc0446fa6c81b60ac7381bd9f81359d395038 Mon Sep 17 00:00:00 2001
+From: Markus Hogsved <markus.hogsved@gmail.com>
+Date: Tue, 20 Oct 2026 19:57:06 +0200
+Subject: [PATCH 2/2] chore: version 0.3.7-mb.1 (multibattery fork)
+
+Shows the fork's version in the browser console banner, so it is easy to
+see which build the dashboard loaded.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ packages/flixlix-cards/power-flow-card-plus/package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/packages/flixlix-cards/power-flow-card-plus/package.json b/packages/flixlix-cards/power-flow-card-plus/package.json
+index b0911c2..a5b5dc5 100644
+--- a/packages/flixlix-cards/power-flow-card-plus/package.json
++++ b/packages/flixlix-cards/power-flow-card-plus/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "power-flow-card-plus",
+   "private": true,
+-  "version": "0.3.7",
++  "version": "0.3.7-mb.1",
+   "type": "module",
+   "description": "A power flow card for Home Assistant",
+   "keywords": [
+-- 
+2.39.5
+

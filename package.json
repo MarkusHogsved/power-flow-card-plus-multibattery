@@ -1,0 +1,12 @@
+{
+  "name": "power-flow-card-plus-multibattery",
+  "version": "0.3.7-mb.1",
+  "private": true,
+  "description": "Power Flow Card Plus with additional batteries (SOC chips and hover tooltip)",
+  "license": "MIT",
+  "upstream": {
+    "repository": "https://github.com/flixlix/flixlix-cards.git",
+    "commit": "28df3548537a2a4e6d6174d4f5736c3ca3fd6e2e",
+    "card_version": "0.3.7"
+  }
+}

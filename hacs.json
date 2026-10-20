@@ -1,5 +1,6 @@
 {
   "name": "Power Flow Card Plus (multibattery)",
   "filename": "power-flow-card-plus-multibattery.js",
+  "homeassistant": "2026.1.0",
   "render_readme": true
 }
