@@ -1,0 +1,30 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"  # weekly, catches new HACS checks breaking us
+
+jobs:
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: plugin
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - name: Build from upstream + patches (typecheck, tests, bundle)
+        run: scripts/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: power-flow-card-plus-multibattery
+          path: dist/power-flow-card-plus-multibattery.js
