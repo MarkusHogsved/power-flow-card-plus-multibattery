@@ -1,7 +1,7 @@
 From 3335138c9432582a5c72a8efb101938632a793e2 Mon Sep 17 00:00:00 2001
 From: Markus Hogsved <markus.hogsved@gmail.com>
 Date: Tue, 20 Oct 2026 20:51:18 +0200
-Subject: [PATCH 2/3] fix(battery): keep flow lines aligned when additional
+Subject: [PATCH 2/4] fix(battery): keep flow lines aligned when additional
  batteries are shown
 
 The room reserved under the battery label for the additional-battery

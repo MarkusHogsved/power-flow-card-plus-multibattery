@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.7-mb.3
+
+- Fix: the individual circle next to the battery (bottom row, e.g. a
+  pool/greenhouse load) and its line up to home no longer move down when
+  `additional_batteries` is used. 0.3.7-mb.2 reserved the room for the chip
+  row as a margin on the battery, which made the whole bottom row taller;
+  the bottom-aligned individual followed it and left a gap under the home
+  circle. The room is now padding on the row, so the row keeps its height.
+
 ## 0.3.7-mb.2
 
 - Fix: the flow lines no longer drift away from the circles when
